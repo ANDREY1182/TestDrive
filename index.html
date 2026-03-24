@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>🏁 Трековая симуляция: Статистика круга</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { margin: 0; padding: 8px; background: #0b1a2f; color: #eef; display: flex; flex-direction: column; min-height: 100vh; }
+        h1 { font-size: 1.6rem; margin: 5px 0 5px; color: #ffcf8a; display: flex; align-items: center; gap: 6px; }
+        .tabs { display: flex; gap: 6px; background: #1f2a40; padding: 5px; border-radius: 40px; margin: 10px 0 15px; }
+        .tab-btn { flex: 1; background: transparent; border: none; color: #aab; font-weight: 600; padding: 10px 2px; border-radius: 30px; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background: #ffae42; color: #0b1a2f; }
+        .panel { display: none; background: #1b263b; border-radius: 30px; padding: 16px 12px; margin-bottom: 18px; }
+        .panel.active { display: block; }
+        .param-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+        .param-row label { width: 130px; font-size: 0.9rem; color: #ccd; }
+        .param-row input, .param-row select { flex: 1; min-width: 140px; background: #2c3750; border: 1px solid #456; border-radius: 24px; padding: 12px 12px; color: white; font-size: 0.95rem; outline: none; transition: border-color 0.2s; }
+        .param-row input:focus, .param-row select:focus { border-color: #ffae42; }
+        .param-row input.track-name { border-color: #4a7c9a; font-weight: bold; background: #1a2a3a; }
+        
+        button { background: #ffae42; border: none; color: #0b1a2f; font-weight: 700; border-radius: 40px; padding: 14px 16px; font-size: 1rem; margin: 12px 0 4px; width: 100%; cursor: pointer; box-shadow: 0 5px 0 #a87020; transition: transform 0.1s, box-shadow 0.1s; }
+        button:active { transform: translateY(4px); box-shadow: 0 1px 0 #a87020; }
+        .small-btn { background: #36455e; color: white; box-shadow: 0 4px 0 #1f2a40; }
+        .btn-group { display: flex; gap: 6px; margin-top: 8px; }
+        .btn-group button { flex: 1; margin: 0; font-size: 0.9rem; padding: 10px; }
+        .btn-save { background: #4a7c59; box-shadow: 0 4px 0 #2a4c39; }
+        .btn-load { background: #597c4a; box-shadow: 0 4px 0 #394c2a; }
+        
+        .track-container { background: #1e2a3a; border-radius: 30px; padding: 15px 10px; margin: 15px 0; border: 3px solid #5f7a9a; touch-action: none; }
+        canvas { display: block; width: 100%; height: auto; background: #2b5f3b; border-radius: 24px; border: 3px solid #aaa; cursor: pointer; touch-action: none; }
+        .stats-row { display: flex; gap: 15px; margin: 10px 0; background: #1f2a40; border-radius: 26px; padding: 15px; }
+        .car-stat { flex: 1; background: #0f1a2c; border-radius: 22px; padding: 12px; text-align: center; }
+        .car-name-display { font-weight: bold; color: #ffcf8a; display: block; margin-bottom: 5px; font-size: 0.9rem; }
+        .winner-badge { background: #2f425b; border-radius: 40px; padding: 16px; text-align: center; margin: 10px 0; font-weight: bold; font-size: 1.1rem; }
+        .gap-display { background: linear-gradient(135deg, #1e3c5a 0%, #2d5a7a 100%); border-radius: 20px; padding: 12px 20px; margin-top: 10px; text-align: center; font-size: 1.1rem; font-weight: 700; border: 2px solid #4a7c9a; }
+        .gap-display .gap-value { color: #ffcf8a; font-size: 1.5rem; margin: 0 10px; }
+        .gap-display .leader { color: #8aff8a; }
+        .note { font-size: 0.8rem; color: #889; margin-top: 4px; font-style: italic; }
+        .section-title { color: #ffae42; font-size: 1.1rem; margin: 15px 0 10px; border-bottom: 1px solid #36455e; padding-bottom: 5px; }
+        .track-preview { background: #1a2a3a; border-radius: 16px; padding: 10px; margin: 10px 0; text-align: center; }
+        .track-info { font-size: 0.85rem; color: #aab; margin-top: 8px; }
+        
+        .lap-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .lap-stat-card {
+            background: linear-gradient(135deg, #1a2a3a 0%, #2a3a4a 100%);
+            border-radius: 20px;
+            padding: 16px;
+            text-align: center;
+            border: 2px solid #3a4a5a;
+        }
+        .lap-stat-card.car-a { border-color: #ff8a8a; }
+        .lap-stat-card.car-b { border-color: #8ab8ff; }
+        .lap-stat-title {
+            font-size: 0.85rem;
+            color: #889;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .lap-stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 6px 0;
+            border-bottom: 1px solid #2a3a4a;
+        }
+        .lap-stat-row:last-child {
+            border-bottom: none;
+        }
+        .lap-stat-label {
+            font-size: 0.8rem;
+            color: #aab;
+        }
+        .lap-stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffcf8a;
+        }
+        .lap-stat-value.highlight {
+            color: #8aff8a;
+            font-size: 1.2rem;
+        }
+        .generator-controls {
+            background: #1a2a3a;
+            border-radius: 20px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 2px solid #4a7c9a;
+        }
+        .generator-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .generator-row label {
+            width: 120px;
+            color: #ffcf8a;
+        }
+        .generator-row input {
+            flex: 1;
+            background: #2c3750;
+            border: 1px solid #456;
+            border-radius: 24px;
+            padding: 10px;
+            color: white;
+        }
+        .generator-row select {
+            flex: 1;
+            background: #2c3750;
+            border: 1px solid #456;
+            border-radius: 24px;
+            padding: 10px;
+            color: white;
+        }
+        .generator-note {
+            font-size: 0.8rem;
+            color: #aab;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        .status-running { color: #8aff8a; }
+        .status-paused { color: #ffae42; }
+        
+        @media (max-width: 600px) {
+            .lap-stats { grid-template-columns: 1fr; }
+            .stats-row { flex-direction: column; }
+            .param-row label { width: 100px; }
+        }
+    </style>
+</head>
+<body>
+    <h1>🏎️ СТАТИСТИКА КРУГА</h1>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="cars">⚙️ Авто А / Б</button>
+        <button class="tab-btn" data-tab="track">🛣️ Конфиг трассы</button>
+        <button class="tab-btn" data-tab="race">🏁 СИМУЛЯТОР</button>
+    </div>
+
+    <div id="cars-panel" class="panel active">
+        <div class="section-title">🚗 Автомобиль А</div>
+        <div class="param-row">
+            <label>Марка/Модель</label>
+            <input type="text" id="a_name" class="car-name" value="LADA Vesta 1.6 2016">
+        </div>
+        <div class="param-row"><label>Мощность, л.с.</label><input type="number" id="a_power" value="106"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="a_powerRpm" value="5800"></div>
+        <div class="param-row"><label>Макс. обороты</label><input type="number" id="a_maxRpm" value="6800" placeholder="Макс. обороты"></div>
+        <div class="param-row"><label>Момент макс, Нм</label><input type="number" id="a_torque" value="148"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="a_torqueRpm" value="4200"></div>
+        <div class="param-row"><label>Масса, кг</label><input type="number" id="a_mass" value="1220"></div>
+        <div class="param-row"><label>КПП (ряд)</label><input type="text" id="a_gears" value="3.727;2.048;1.393;1.029;0.795"></div>
+        <div class="param-row"><label>Главная пара</label><input type="number" id="a_final" value="3.867" step="0.001"></div>
+        <div class="param-row"><label>Шины</label><input type="text" id="a_tire" value="195/55 R16"></div>
+        <div class="param-row"><label>Тип кузова</label>
+            <select id="a_body">
+                <option value="sedan">Седан</option>
+                <option value="hatchback">Хэтчбек</option>
+                <option value="wagon">Универсал</option>
+                <option value="coupe">Купе</option>
+                <option value="suv">Кроссовер/SUV</option>
+                <option value="offroad">Внедорожник</option>
+                <option value="pickup">Пикап</option>
+                <option value="sports">Спорткар</option>
+                <option value="supercar">Суперкар</option>
+                <option value="minivan">Минивэн</option>
+            </select>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn-save" id="saveBtnA">💾 Сохранить А</button>
+            <button class="btn-load" id="loadBtnA">📂 Загрузить А</button>
+            <input type="file" id="loadFileA" accept=".json" style="display:none">
+        </div>
+
+        <div class="section-title">🚙 Автомобиль Б</div>
+        <div class="param-row">
+            <label>Марка/Модель</label>
+            <input type="text" id="b_name" class="car-name" value="Skoda Yeti 1.2 TSI">
+        </div>
+        <div class="param-row"><label>Мощность, л.с.</label><input type="number" id="b_power" value="105"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="b_powerRpm" value="5000"></div>
+        <div class="param-row"><label>Макс. обороты</label><input type="number" id="b_maxRpm" value="6500" placeholder="Макс. обороты"></div>
+        <div class="param-row"><label>Момент макс, Нм</label><input type="number" id="b_torque" value="175"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="b_torqueRpm" value="4100"></div>
+        <div class="param-row"><label>Масса, кг</label><input type="number" id="b_mass" value="1370"></div>
+        <div class="param-row"><label>КПП (ряд)</label><input type="text" id="b_gears" value="3.615;1.955;1.281;0.973;0.778;0.646"></div>
+        <div class="param-row"><label>Главная пара</label><input type="number" id="b_final" value="4.353" step="0.001"></div>
+        <div class="param-row"><label>Шины</label><input type="text" id="b_tire" value="215/60 R16"></div>
+        <div class="param-row"><label>Тип кузова</label>
+            <select id="b_body">
+                <option value="sedan">Седан</option>
+                <option value="hatchback">Хэтчбек</option>
+                <option value="wagon">Универсал</option>
+                <option value="coupe">Купе</option>
+                <option value="suv" selected>Кроссовер/SUV</option>
+                <option value="offroad">Внедорожник</option>
+                <option value="pickup">Пикап</option>
+                <option value="sports">Спорткар</option>
+                <option value="supercar">Суперкар</option>
+                <option value="minivan">Минивэн</option>
+            </select>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn-save" id="saveBtnB">💾 Сохранить Б</button>
+            <button class="btn-load" id="loadBtnB">📂 Загрузить Б</button>
+            <input type="file" id="loadFileB" accept=".json" style="display:none">
+        </div>
+
+        <button id="resetParams" style="margin-top:15px;">↻ Сброс А/Б эталон</button>
+    </div>
+
+    <div id="track-panel" class="panel">
+        <h3>🛣️ Параметры трассы</h3>
+        
+        <div class="generator-controls">
+            <div class="section-title">🎲 Генератор трасс</div>
+            <div class="generator-row">
+                <label>Тип трассы:</label>
+                <select id="trackTypeSelect" style="flex:1;">
+                    <option value="twisty" selected>🐍 Извилистая (кольцо)</option>
+                    <option value="oval">⭕ Овал (кольцо)</option>
+                    <option value="drag">🏁 Драг (прямая)</option>
+                </select>
+            </div>
+            <div class="generator-row">
+                <label>Сложность:</label>
+                <input type="range" id="genComplexity" min="0" max="100" value="50" style="flex:1;">
+                <span id="complexityValue" style="color:#ffcf8a; min-width:40px;">50</span>
+            </div>
+            <div class="generator-note">
+                • Для извилистой: больше поворотов и круче радиус<br>
+                • Для овала: фиксированная эллиптическая форма<br>
+                • Для драга: прямая линия
+            </div>
+            <button id="generateTrackBtn" style="margin:10px 0 5px;">🎲 Сгенерировать</button>
+        </div>
+        
+        <div class="param-row">
+            <label>Название трассы</label>
+            <input type="text" id="trackName" class="track-name" value="Домашний трек">
+        </div>
+        <div class="param-row"><label>Длина круга, м</label><input type="number" id="trackLength" value="1800" step="50" readonly style="background:#1a2a3a;"></div>
+        <div class="param-row"><label>Кол-во поворотов</label><input type="number" id="trackTurns" value="8" min="4" max="16" readonly style="background:#1a2a3a;"></div>
+        <div class="param-row"><label>Ширина трассы, м</label><input type="number" id="trackWidth" value="10" min="6" max="20"></div>
+        <div class="param-row"><label>Сцепление</label><input type="number" id="grip" value="1.0" step="0.05" min="0.5" max="1.5"></div>
+        
+        <div class="track-preview">
+            <canvas id="trackPreviewCanvas" width="400" height="300"></canvas>
+            <div class="track-info" id="trackInfo">Извилистая • 1800м • 8 поворотов</div>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn-save" id="saveTrackBtn">💾 Сохранить трассу (CSV)</button>
+            <button class="btn-load" id="loadTrackBtn">📂 Загрузить трассу (CSV)</button>
+            <input type="file" id="loadTrackFile" accept=".csv" style="display:none">
+        </div>
+        <button id="applyTrackBtn" style="margin-top:10px;">✅ Применить</button>
+    </div>
+
+    <div id="race-panel" class="panel">
+        <h2>🏁 СИМУЛЯЦИЯ</h2>
+        <div class="track-container">
+            <canvas id="trackCanvas" width="800" height="600"></canvas>
+        </div>
+        <div class="stats-row">
+            <div class="car-stat">
+                <span class="car-name-display" id="nameDisplayA" style="color:#ff8a8a;">LADA Vesta</span>
+                <span id="speedA">0</span> км/ч • <span id="gearA">1</span> • <span id="rpmA">0</span> об/мин
+            </div>
+            <div class="car-stat">
+                <span class="car-name-display" id="nameDisplayB" style="color:#8ab8ff;">Skoda Yeti</span>
+                <span id="speedB">0</span> км/ч • <span id="gearB">1</span> • <span id="rpmB">0</span> об/мин
+            </div>
+        </div>
+        <div class="winner-badge" id="liveWinner">Гонка: идёт</div>
+        <div class="gap-display">
+            Отставание: <span class="gap-value" id="gapValue">0</span> м <span id="gapLeader"></span>
+        </div>
+        
+        <div class="lap-stats">
+            <div class="lap-stat-card car-a">
+                <div class="lap-stat-title" id="lapTitleA">LADA Vesta</div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">⏱️ 0-100 км/ч</span>
+                    <span class="lap-stat-value highlight" id="accel0to100A">--.-- с</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">📊 Средняя скорость</span>
+                    <span class="lap-stat-value" id="avgSpeedA">0 км/ч</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">🏁 Лучший круг</span>
+                    <span class="lap-stat-value" id="bestLapA">--:--.--</span>
+                </div>
+            </div>
+            <div class="lap-stat-card car-b">
+                <div class="lap-stat-title" id="lapTitleB">Skoda Yeti</div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">⏱️ 0-100 км/ч</span>
+                    <span class="lap-stat-value highlight" id="accel0to100B">--.-- с</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">📊 Средняя скорость</span>
+                    <span class="lap-stat-value" id="avgSpeedB">0 км/ч</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">🏁 Лучший круг</span>
+                    <span class="lap-stat-value" id="bestLapB">--:--.--</span>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+            <button id="startSimBtn">▶ СТАРТ / ПАУЗА</button>
+            <button id="resetSimBtn" class="small-btn">🔄 Сброс</button>
+        </div>
+    </div>
+
+    <!-- Подключение модулей -->
+    <script type="module">
+        import { Car } from './js/models/Car.js';
+        import { Track } from './js/models/Track.js';
+        import { RaceSimulator } from './js/simulation/RaceSimulator.js';
+        import { TrackRenderer } from './js/rendering/TrackRenderer.js';
+        import { UIManager } from './js/ui/UIManager.js';
+        import { CarConfigUI } from './js/ui/CarConfigUI.js';
+        import { FileStorage } from './js/storage/FileStorage.js';
+        import { TrackGenerator } from './js/lib/TrackGenerator.js';
+
+        // Главный класс приложения
+        class RacingApp {
+            constructor() {
+                this.ui = new UIManager();
+                this.carConfigA = new CarConfigUI('a', () => this.updateCars());
+                this.carConfigB = new CarConfigUI('b', () => this.updateCars());
+                this.trackRenderer = null;
+                this.previewRenderer = null;
+                this.simulator = null;
+                this.track = null;
+                this.carA = null;
+                this.carB = null;
+                this.isRunning = false;
+                this.intervalId = null;
+                this.dt = 0.05;
+                
+                this.init();
+            }
+
+            init() {
+                // Инициализация UI
+                this.ui.init();
+                this.ui.onStartPause(() => this.toggleSimulation());
+                this.ui.onReset(() => this.resetSimulation());
+                
+                // Инициализация рендереров
+                const canvas = document.getElementById('trackCanvas');
+                const previewCanvas = document.getElementById('trackPreviewCanvas');
+                this.trackRenderer = new TrackRenderer(canvas, 800, 600);
+                this.previewRenderer = new TrackRenderer(previewCanvas, 400, 300);
+                
+                // Генерация начальной трассы
+                this.generateInitialTrack();
+                
+                // Загрузка начальных автомобилей
+                this.updateCars();
+                
+                // Настройка кнопок сохранения/загрузки
+                this.setupStorageButtons();
+                
+                // Настройка генератора трасс
+                this.setupTrackGenerator();
+                
+                // Запуск анимации
+                this.animate();
+            }
+
+            updateCars() {
+                this.carA = new Car(this.carConfigA.getCarData());
+                this.carB = new Car(this.carConfigB.getCarData());
+                
+                if (this.simulator) {
+                    this.simulator.carA = this.carA.clone();
+                    this.simulator.carB = this.carB.clone();
+                    this.resetSimulation();
+                }
+            }
+
+            generateInitialTrack() {
+                const generator = new TrackGenerator(800, 600);
+                const result = generator.generate('twisty', 50);
+                
+                this.track = new Track({
+                    name: 'Домашний трек',
+                    type: 'twisty',
+                    centerLine: result.points,
+                    cornerRadii: result.radii,
+                    turns: result.radii.length
+                });
+                this.track.length = this.track.calculateLengthFromPoints();
+                
+                document.getElementById('trackName').value = this.track.name;
+                document.getElementById('trackLength').value = this.track.length;
+                document.getElementById('trackTurns').value = this.track.turns;
+                
+                this.previewRenderer.drawPreview(this.track.centerLine);
+                this.createSimulator();
+            }
+
+            createSimulator() {
+                if (this.carA && this.carB && this.track) {
+                    this.simulator = new RaceSimulator(this.carA, this.carB, this.track, this.dt);
+                    
+                    this.simulator.onLapComplete((car, lapTime, avgSpeed) => {
+                        console.log(`${car} прошел круг за ${lapTime.toFixed(2)}с, средняя скорость: ${(avgSpeed * 3.6).toFixed(0)} км/ч`);
+                        this.updateStats(car, lapTime, avgSpeed);
+                    });
+                }
+            }
+            
+            updateStats(car, lapTime, avgSpeed) {
+                if (car === 'A') {
+                    document.getElementById('avgSpeedA').innerText = Math.round(avgSpeed * 3.6) + ' км/ч';
+                    document.getElementById('bestLapA').innerText = this.ui.formatTime(lapTime);
+                } else {
+                    document.getElementById('avgSpeedB').innerText = Math.round(avgSpeed * 3.6) + ' км/ч';
+                    document.getElementById('bestLapB').innerText = this.ui.formatTime(lapTime);
+                }
+            }
+
+            resetSimulation() {
+                if (this.simulator) {
+                    this.simulator.reset();
+                    this.simulator.carA = this.carA.clone();
+                    this.simulator.carB = this.carB.clone();
+                }
+                this.updateDisplay();
+            }
+
+            toggleSimulation() {
+                if (this.isRunning) {
+                    this.stopSimulation();
+                } else {
+                    this.startSimulation();
+                }
+            }
+
+            startSimulation() {
+                if (this.intervalId) clearInterval(this.intervalId);
+                this.isRunning = true;
+                this.intervalId = setInterval(() => this.updateSimulation(), this.dt * 1000);
+                this.ui.updateStartButton(true);
+            }
+
+            stopSimulation() {
+                this.isRunning = false;
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                }
+                this.ui.updateStartButton(false);
+            }
+
+            updateSimulation() {
+                if (!this.simulator || !this.isRunning) return;
+                
+                const state = this.simulator.update();
+                this.updateDisplay();
+                this.renderTrack(state);
+            }
+
+            updateDisplay() {
+                if (!this.simulator) return;
+                
+                const state = this.simulator.getState();
+                this.ui.updateSimulationDisplay(state, this.carA, this.carB);
+            }
+
+            renderTrack(state) {
+                if (!this.track) return;
+                
+                const cars = [
+                    { id: 'A', position: state.posA },
+                    { id: 'B', position: state.posB }
+                ];
+                
+                this.trackRenderer.draw(this.track, cars);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if (!this.isRunning && this.simulator) {
+                    this.renderTrack(this.simulator.getState());
+                }
+            }
+
+            setupStorageButtons() {
+                // Сохранение автомобилей
+                document.getElementById('saveBtnA').onclick = () => {
+                    FileStorage.save(this.carConfigA.getCarData(), `${this.carA.name}_A.json`);
+                };
+                document.getElementById('saveBtnB').onclick = () => {
+                    FileStorage.save(this.carConfigB.getCarData(), `${this.carB.name}_B.json`);
+                };
+                
+                // Загрузка автомобилей
+                document.getElementById('loadBtnA').onclick = () => {
+                    document.getElementById('loadFileA').click();
+                };
+                document.getElementById('loadFileA').onchange = (e) => {
+                    FileStorage.load(e.target, (data) => {
+                        this.carConfigA.setCarData(data);
+                    });
+                };
+                
+                document.getElementById('loadBtnB').onclick = () => {
+                    document.getElementById('loadFileB').click();
+                };
+                document.getElementById('loadFileB').onchange = (e) => {
+                    FileStorage.load(e.target, (data) => {
+                        this.carConfigB.setCarData(data);
+                    });
+                };
+                
+                // Сохранение трассы
+                document.getElementById('saveTrackBtn').onclick = () => {
+                    if (this.track.centerLine && this.track.centerLine.length > 0) {
+                        FileStorage.saveCSV(this.track.centerLine, `${this.track.name}.csv`);
+                    } else {
+                        alert('Сначала сгенерируйте трассу!');
+                    }
+                };
+                
+                // Загрузка трассы
+                document.getElementById('loadTrackBtn').onclick = () => {
+                    document.getElementById('loadTrackFile').click();
+                };
+                document.getElementById('loadTrackFile').onchange = (e) => {
+                    FileStorage.loadCSV(e.target, (points) => {
+                        if (points.length >= 3) {
+                            this.track.centerLine = points;
+                            this.track.type = 'twisty';
+                            this.track.turns = Math.floor(points.length / 15);
+                            this.track.cornerRadii = new Array(this.track.turns).fill(35);
+                            this.track.length = this.track.calculateLengthFromPoints();
+                            
+                            document.getElementById('trackName').value = this.track.name;
+                            document.getElementById('trackLength').value = this.track.length;
+                            document.getElementById('trackTurns').value = this.track.turns;
+                            
+                            this.previewRenderer.drawPreview(this.track.centerLine);
+                            this.createSimulator();
+                            this.resetSimulation();
+                        } else {
+                            alert('Недостаточно точек в файле');
+                        }
+                    });
+                };
+                
+                // Сброс параметров
+                document.getElementById('resetParams').onclick = () => {
+                    this.resetToDefaults();
+                };
+                
+                // Применение трассы
+                document.getElementById('applyTrackBtn').onclick = () => {
+                    this.track.name = document.getElementById('trackName').value || 'Трасса';
+                    this.track.width = parseFloat(document.getElementById('trackWidth').value) || 10;
+                    this.track.grip = parseFloat(document.getElementById('grip').value) || 1.0;
+                    this.resetSimulation();
+                    this.renderTrack(this.simulator ? this.simulator.getState() : { posA: 0, posB: 0 });
+                };
+            }
+
+            setupTrackGenerator() {
+                const complexityInput = document.getElementById('genComplexity');
+                const complexitySpan = document.getElementById('complexityValue');
+                
+                complexityInput.addEventListener('input', () => {
+                    complexitySpan.textContent = complexityInput.value;
+                });
+                
+                document.getElementById('generateTrackBtn').onclick = () => {
+                    const type = document.getElementById('trackTypeSelect').value;
+                    const complexity = parseInt(complexityInput.value) || 50;
+                    
+                    const generator = new TrackGenerator(800, 600);
+                    const result = generator.generate(type, complexity);
+                    
+                    this.track = new Track({
+                        name: this.getTrackTypeName(type),
+                        type: type,
+                        centerLine: result.points,
+                        cornerRadii: result.radii,
+                        turns: type === 'drag' ? 0 : (type === 'oval' ? 4 : result.radii.length)
+                    });
+                    this.track.length = this.track.calculateLengthFromPoints();
+                    
+                    document.getElementById('trackName').value = this.track.name;
+                    document.getElementById('trackLength').value = this.track.length;
+                    document.getElementById('trackTurns').value = this.track.turns;
+                    
+                    this.previewRenderer.drawPreview(this.track.centerLine);
+                    this.createSimulator();
+                    this.resetSimulation();
+                };
+            }
+
+            getTrackTypeName(type) {
+                const names = {
+                    'drag': 'Драг',
+                    'oval': 'Овал',
+                    'twisty': 'Извилистая'
+                };
+                return `${names[type]} трасса ${new Date().toLocaleTimeString()}`;
+            }
+
+            resetToDefaults() {
+                // Сброс автомобиля А
+                this.carConfigA.setCarData({
+                    name: 'LADA Vesta 1.6 2016',
+                    power: 106,
+                    powerRpm: 5800,
+                    maxRpm: 6800,
+                    torque: 148,
+                    torqueRpm: 4200,
+                    mass: 1220,
+                    gearRatios: [3.727, 2.048, 1.393, 1.029, 0.795],
+                    finalDrive: 3.867,
+                    tire: '195/55 R16',
+                    body: 'sedan'
+                });
+                
+                // Сброс автомобиля Б
+                this.carConfigB.setCarData({
+                    name: 'Skoda Yeti 1.2 TSI',
+                    power: 105,
+                    powerRpm: 5000,
+                    maxRpm: 6500,
+                    torque: 175,
+                    torqueRpm: 4100,
+                    mass: 1370,
+                    gearRatios: [3.615, 1.955, 1.281, 0.973, 0.778, 0.646],
+                    finalDrive: 4.353,
+                    tire: '215/60 R16',
+                    body: 'suv'
+                });
+                
+                this.updateCars();
+                this.resetSimulation();
+            }
+        }
+
+        // Запуск приложения
+        window.app = new RacingApp();
+    </script>
+</body>
+</html>
